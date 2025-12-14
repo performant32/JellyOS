@@ -69,12 +69,10 @@ int CHSToLBS(BPB* bpb, int c, int h, int s){
 CHS LBAToCHS(BPB* bpb, int lba){
     CHS chs;
     unsigned int s = bpb->m_SectorsPerTrack;
-    uint32_t sector = (lba % s) + 1;
-    uint32_t head = (lba / s) % bpb->m_Heads;
-    uint32_t cyl = (lba / s) / bpb->m_Heads;
-    chs.m_Head = (lba % (bpb->m_SectorsPerTrack * 2)) / bpb->m_SectorsPerTrack;
-    chs.m_Cylinder = (lba / (bpb->m_SectorsPerTrack * 2));
-    chs.m_Sector = (lba % bpb->m_SectorsPerTrack) + 1;
+    unsigned int temp = lba / s;
+    chs.m_Sector = (lba % s) + 1;
+    chs.m_Head = temp % s;
+    chs.m_Cylinder = temp / bpb->m_Heads;
     return chs;
 }
 int main(int argc, char** argv){
@@ -125,7 +123,7 @@ int main(int argc, char** argv){
     // Reading Main File
     for(size_t i = 0; i < bpb.m_RootEntries; i++){
         DirectoryEntry* entry = &root[i];
-        if(strncmp(entry->m_FileName, "BOOT2   BIN", 11)){
+        if(strncmp(entry->m_FileName, "STAGE6  BIN", 11)){
             continue;
         }
         printf("Got file");

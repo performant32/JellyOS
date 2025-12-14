@@ -22,8 +22,8 @@ make_files:
 build_floppy: make_files stage1 stage2
 	dd if=/dev/zero of=bin/silix.floppy bs=512 count=2880
 	mkfs.fat -F 12 bin/silix.floppy 
-	mcopy -i bin/silix.floppy $(STAGE1_BIN)/stage1.bin ::/BOOT2.bin
-	dd if=$(STAGE2_BIN)/stage2.bin of=bin/silix.floppy bs=512 count=1 conv=notrunc
+	mcopy -i bin/silix.floppy $(STAGE2_BIN)/stage2.bin ::/STAGE6.bin
+	dd if=$(STAGE1_BIN)/stage1.bin of=bin/silix.floppy bs=512 count=1 conv=notrunc
 stage1:
 	$(MAKE) -C $(BOOTLOADER_SRC)/stage1 stage1 BIN_DIR=$(abspath $(STAGE1_BIN))
 stage2:
