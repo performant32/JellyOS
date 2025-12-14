@@ -18,15 +18,16 @@ make_files:
 	echo $(wildcard src/boot/*.asm)
 	mkdir -p $(OBJ_DIR)
 	mkdir -p $(ISO_DIR)
-build_floppy: make_files boot1
-	dd if=/dev/zero of=bin/silix.floppy bs=512 count=2734
+build_floppy: make_files boot1 boot2
+	dd if=/dev/zero of=bin/silix.floppy bs=512 count=2880
 	mkfs.fat -F 12 bin/silix.floppy 
-	echo "Hello MFat12Hello" | mcopy -i bin/silix.floppy - ::/source.txt 
-	#dd if=$(OBJ_DIR)/boot1.bin of=bin/silix.floppy bs=512 count=1 conv=notrunc
-
+	mcopy -i bin/silix.floppy $(OBJ_DIR)/boot2.bin ::/BOOT2.bin
+	dd if=$(OBJ_DIR)/boot1.bin of=bin/silix.floppy bs=512 count=1 conv=notrunc
 boot1:
 	$(ASM) $(ASM_FLAGS) $(BOOT_SRC)/boot1.asm -o $(OBJ_DIR)/boot1.bin
+boot2:
+	$(ASM) $(ASM_FLAGS) $(BOOT_SRC)/boot2.asm -o $(OBJ_DIR)/boot2.bin
 run_floppy:
-	qemu-system-x86_64 $(BOOT_OPTIONS) -fda bin/silix.floppy 
+	qemu-system-x86_64 $(BOOT_OPTIONS) -fda $(BIN_DIR)/silix.floppy -boot  order=a
 fat12:
 	$(MAKE) -C tools/fat12/ fat12 OUTPUT_DIR=$(abspath bin/tools)

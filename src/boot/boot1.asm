@@ -1,18 +1,18 @@
 bits 16
-org 0x7C00
-jmp start
+org 0x7C00  
+jmp strict near start
 
 ; Fat12 Headers
 fat_oem_name: db "MSWin4.1"
 fat_bytes_per_cluster: dw 512
-fat_sectors_per_cluster: db 4
+fat_sectors_per_cluster: db 1
 fat_reserved_sector_count: dw 1
 fat_table_count: db 2
-fat_max_root_dir_entries:dw 224
-fat_total_sectors: db 2720
-fat_media_descriptor_type: db 0xF8
-fat_sectors_per_fat: dw 2
-fat_sectors_per_track: dw 16
+fat_root_dir_entries:dw 224
+fat_total_sectors: dw 2880
+fat_media_descriptor_type: db 0xF0
+fat_sectors_per_fat: dw 9
+fat_sectors_per_track: dw 18
 fat_heads_per_side: dw 2
 fat_hidden_sectors: dd 0
 fat_large_sector_count:dd 0
@@ -21,7 +21,6 @@ start:
     mov ax, 0
     mov ss, ax
     mov ds, ax
-    mov ax, 0xFFFF
     mov es, ax
 
     cld
@@ -46,41 +45,48 @@ get_drive_parameters:
     mov [bp - 2], dl
 
     ; Get Drive Parameters
-    ;mov ah, 0x8
-    ;mov di, 0   ; Some buggy BIOS
-    ;mov dl, 0xE0
-    ;int 0x13
+    mov ah, 0x8
+    mov di, 0   ; Some buggy BIOS
+    mov dl, 0x0
+    int 0x13
 
-    ;jnc .ReadSectors
-    ;lea si, [ds:msg_parameter_error]
-    ;call print_string
-    ;jmp .Done
+    jnc .ReadSectors
+    lea si, [ds:msg_parameter_error]
+    call print_string
+    jmp .Done
 .ReadSectors:
-    sub bp, 2
-    ; Settings up DAP
     mov ax, 0
     mov es, ax
-    mov word [bp - 16], 0x0010
-    mov word [bp - 14], 1
-    mov word [bp - 12], 1
-    mov word [bp - 10], es
-    mov dword [bp - 8], 0
-    mov dword [bp - 4], 0
-
-    ; Calling Read Sectors
-    mov ah, 0x42
-    lea si, [bp-16]
-    mov dl, [bp-2]
+    mov ah, 0x2
+    mov al, 1
+    mov ch, 0
+    mov cl, 16
+    mov dh, 1
+    mov dl, 0x0
+    mov bx, 0x7D00
     int 0x13
-    add bp, 2
 
     ; Checking Errors
     jnc .Success
-    lea si, msg_read_sectors_failed
+    mov dl, ah
+    mov ah, 0x0E
+    mov al, dl
+    and al, 0b11110000
+    shr al, 4
+    add al, '0'
+    int 0x10
+    mov al, dl
+    and al, 0b1111
+    add al, '0'
+    int 0x10
+    mov si, msg_read_sectors_failed
     call print_string
     jmp .Done
-.Success:
-    lea si, msg_success
+.Success: 
+    cld
+    mov si, msg_success
+    call print_string
+    mov si, bx
     call print_string
 .Done:
     leave
@@ -99,6 +105,14 @@ print_string:
     jmp .Loop
 .Finish:
     ret
+DAPACK:
+    db 0x10
+    db 0x00
+    dw 1
+    dw 0x7C00
+    dw 0
+    dd 51
+    dd 0
 times 446 - ($-$$) db 0
 ; Data
 %define ENDL 13, 10

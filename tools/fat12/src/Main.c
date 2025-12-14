@@ -43,6 +43,11 @@ typedef struct DirectoryEntry{
     uint32_t m_Size;
 }__attribute((packed)) DirectoryEntry;
 
+typedef struct CHS{
+    uint32_t m_Cylinder;
+    uint32_t m_Head;
+    uint32_t m_Sector;
+} CHS;
 char* ReadFile(char* disk, BPB* bpb, DirectoryEntry* entry, char fileName[11]){
     if(entry->m_Size < 1)return NULL;
     bool t = false;
@@ -57,6 +62,20 @@ char* ReadFile(char* disk, BPB* bpb, DirectoryEntry* entry, char fileName[11]){
     printf("First cluster %u\n", entry->m_FirstLogicalCluster);
     mempcpy(data, disk +clusterLocation + bpb->m_SectorsPerCluster * entry->m_FirstLogicalCluster, 15);
     return data;
+}
+int CHSToLBS(BPB* bpb, int c, int h, int s){
+    return 0;
+}
+CHS LBAToCHS(BPB* bpb, int lba){
+    CHS chs;
+    unsigned int s = bpb->m_SectorsPerTrack;
+    uint32_t sector = (lba % s) + 1;
+    uint32_t head = (lba / s) % bpb->m_Heads;
+    uint32_t cyl = (lba / s) / bpb->m_Heads;
+    chs.m_Head = (lba % (bpb->m_SectorsPerTrack * 2)) / bpb->m_SectorsPerTrack;
+    chs.m_Cylinder = (lba / (bpb->m_SectorsPerTrack * 2));
+    chs.m_Sector = (lba % bpb->m_SectorsPerTrack) + 1;
+    return chs;
 }
 int main(int argc, char** argv){
     if(argc < 2){
@@ -93,30 +112,33 @@ int main(int argc, char** argv){
 
     printf("Sectors per cluster %u\n", bpb.m_SectorsPerCluster); 
     printf("Fat count %u\n", bpb.m_FatCount); 
+    printf("reserved count %u\n", bpb.m_ReservedSectors);
     printf("Sectors per fat %u\n", bpb.m_SectorsPerFAT); 
     printf("Total Sectors %u\n", bpb.m_TotalSectors);
     printf("Sectors track %u\n", bpb.m_SectorsPerTrack);
     printf("Hiden Sectors %u\n", bpb.m_HiddenSectors);
     printf("Media Descriptor Type %X\n", bpb.m_MediaDescriptorType);
     printf("Heads Per Size %u\n", bpb.m_Heads);
-
-    DirectoryEntry root[16];
-    mempcpy(root, data + (512 * (1 + bpb.m_FatCount * bpb.m_SectorsPerFAT)), sizeof(root));
+    printf("Root Entries %u\n", bpb.m_RootEntries);
+    DirectoryEntry* root = (DirectoryEntry*)(data+ (512 * (1 + bpb.m_FatCount * bpb.m_SectorsPerFAT)));
 
     // Reading Main File
-    for(size_t i = 0; i < 16; i++){
+    for(size_t i = 0; i < bpb.m_RootEntries; i++){
         DirectoryEntry* entry = &root[i];
-        if(strncmp(entry->m_FileName, "SOURCE  TXT", 11))continue;
+        if(strncmp(entry->m_FileName, "BOOT2   BIN", 11)){
+            continue;
+        }
         printf("Got file");
         printf("Data size %d\n", entry->m_Size);
         char* fileData = (char*)malloc(entry->m_Size);
         size_t cluster = entry->m_FirstLogicalCluster;
         size_t offset = bpb.m_BytesPerSector * (bpb.m_ReservedSectors + bpb.m_SectorsPerFAT * bpb.m_FatCount) + sizeof(DirectoryEntry) * bpb.m_RootEntries + (cluster - 2) * bpb.m_SectorsPerCluster * bpb.m_BytesPerSector;
-        uint8_t fatOffset= bpb.m_BytesPerSector * (bpb.m_ReservedSectors); 
-        //uint8_t offset = cluster % 2 == 0;
-        //size_t offset = bpb.m_BytesPerSector * 33 + (entry->m_FirstLogicalCluster-2) * bpb.m_SectorsPerCluster;
+        size_t lba = (bpb.m_ReservedSectors + bpb.m_SectorsPerFAT * bpb.m_FatCount) + (((bpb.m_RootEntries * sizeof(DirectoryEntry) + (bpb.m_BytesPerSector - 1)) / bpb.m_BytesPerSector)) + (cluster - 2) * bpb.m_SectorsPerCluster;
         printf("Logical cluster %u\n", bpb.m_SectorsPerCluster);
         printf("offset %u\n", offset);
+        printf("LBA id is %u\n", lba);
+        CHS chs = LBAToCHS(&bpb, lba);
+        printf("CHS %u %u %u\n", chs.m_Cylinder, chs.m_Head, chs.m_Sector);
         memcpy(fileData,
             data + offset
         ,entry->m_Size);
